@@ -44,6 +44,7 @@ export default function OrderPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
+  const [lastOrder, setLastOrder] = useState<{ total: number; paymentType: 'cash' | 'credit'; customerName?: string } | null>(null);
 
   const filteredServices =
     activeCategory === 'all'
@@ -56,9 +57,17 @@ export default function OrderPage() {
     if (currentOrder.length === 0) return;
     if (paymentType === 'credit' && !selectedCustomerId) return;
 
+    const orderTotal = getOrderTotal();
+    const customer = customers.find((c) => c.id === selectedCustomerId);
+    setLastOrder({
+      total: orderTotal,
+      paymentType,
+      customerName: paymentType === 'credit' ? customer?.name : undefined,
+    });
+
     checkout(paymentType, paymentType === 'credit' ? selectedCustomerId : undefined);
     setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
+    setTimeout(() => setShowSuccess(false), 3000);
     setSelectedCustomerId('');
   };
 
@@ -217,14 +226,29 @@ export default function OrderPage() {
         </div>
       </div>
 
-      {showSuccess && (
-        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl p-8 z-50 animate-bounce-in">
+      {showSuccess && lastOrder && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl p-8 z-50 animate-bounce-in min-w-80">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-10 h-10 text-green-500" />
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">开单成功！</h3>
-            <p className="text-gray-500">合计 {formatMoney(total)}</p>
+            <p className="text-3xl font-bold text-primary-600 mb-3">
+              ¥{lastOrder.total.toFixed(2)}
+            </p>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700">
+              {lastOrder.paymentType === 'cash' ? (
+                <>
+                  <Wallet className="w-4 h-4 text-green-500" />
+                  现金支付
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4 text-orange-500" />
+                  挂账 · {lastOrder.customerName}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

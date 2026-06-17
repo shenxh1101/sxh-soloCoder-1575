@@ -9,9 +9,12 @@ import {
   Wallet,
   Receipt,
   Clock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { formatDate, formatMoney } from '@/utils/storage';
+import type { Order } from '@/types';
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +23,7 @@ export default function CustomerDetailPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const customer = customers.find((c) => c.id === id);
   const debt = id ? getCustomerDebt(id) : 0;
@@ -58,6 +62,7 @@ export default function CustomerDetailPage() {
       amount: o.total,
       date: o.createdAt,
       description: `订单 - ${o.items.length}项服务`,
+      order: o,
     })),
     ...customerPayments.map((p) => ({
       type: 'payment' as const,
@@ -65,6 +70,7 @@ export default function CustomerDetailPage() {
       amount: p.amount,
       date: p.createdAt,
       description: p.note || '还款',
+      note: p.note,
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -145,35 +151,86 @@ export default function CustomerDetailPage() {
         <div className="p-4 border-b border-gray-100">
           <h3 className="font-bold text-gray-800">交易记录</h3>
         </div>
-        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
           {allRecords.length === 0 ? (
             <div className="p-12 text-center text-gray-400">暂无交易记录</div>
           ) : (
             allRecords.map((record) => (
-              <div
-                key={record.id}
-                className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors"
-              >
+              <div key={record.id}>
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    record.type === 'order'
-                      ? 'bg-red-100 text-red-500'
-                      : 'bg-green-100 text-green-500'
+                  className={`p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                    record.type === 'order' ? '' : 'cursor-default'
                   }`}
+                  onClick={() => {
+                    if (record.type === 'order') {
+                      setExpandedOrderId(expandedOrderId === record.id ? null : record.id);
+                    }
+                  }}
                 >
-                  {record.type === 'order' ? <Receipt className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      record.type === 'order'
+                        ? 'bg-red-100 text-red-500'
+                        : 'bg-green-100 text-green-500'
+                    }`}
+                  >
+                    {record.type === 'order' ? <Receipt className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-800">{record.description}</p>
+                      {record.type === 'order' && (
+                        expandedOrderId === record.id ? (
+                          <ChevronUp className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        )
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500">{formatDate(record.date)}</p>
+                    {record.type === 'payment' && record.note && (
+                      <p className="text-xs text-gray-400 mt-1">备注：{record.note}</p>
+                    )}
+                  </div>
+                  <div
+                    className={`text-lg font-bold flex-shrink-0 ${
+                      record.type === 'order' ? 'text-red-500' : 'text-green-500'
+                    }`}
+                  >
+                    {record.type === 'order' ? '+' : '-'}¥{record.amount.toFixed(2)}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-800">{record.description}</p>
-                  <p className="text-sm text-gray-500">{formatDate(record.date)}</p>
-                </div>
-                <div
-                  className={`text-lg font-bold ${
-                    record.type === 'order' ? 'text-red-500' : 'text-green-500'
-                  }`}
-                >
-                  {record.type === 'order' ? '+' : '-'}¥{record.amount.toFixed(2)}
-                </div>
+
+                {record.type === 'order' && expandedOrderId === record.id && record.order && (
+                  <div className="bg-gray-50 border-t border-gray-100 px-4 py-3">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-gray-500 text-xs">
+                          <th className="text-left py-2 font-medium">服务项目</th>
+                          <th className="text-right py-2 font-medium">单价</th>
+                          <th className="text-right py-2 font-medium">数量</th>
+                          <th className="text-right py-2 font-medium">小计</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {record.order.items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="py-2 text-gray-700">{item.serviceName}</td>
+                            <td className="py-2 text-right text-gray-500">¥{item.price.toFixed(2)}</td>
+                            <td className="py-2 text-right text-gray-500">{item.quantity}</td>
+                            <td className="py-2 text-right font-medium text-gray-700">¥{item.subtotal.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-gray-200">
+                          <td colSpan={3} className="py-2 text-right font-medium text-gray-700">合计</td>
+                          <td className="py-2 text-right font-bold text-red-500">+¥{record.order.total.toFixed(2)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </div>
             ))
           )}
